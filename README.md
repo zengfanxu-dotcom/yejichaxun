@@ -149,6 +149,6 @@ docker-compose up -d
 
 ## 联系方式
 
-- 项目维护者：Your Name
-- 邮箱：your.email@example.com
+- 项目维护者：Fanxu Zeng
+- 邮箱：zengfanxu9@gmail.com
 - 项目地址：https://github.com/yourusername/yejichaxun
