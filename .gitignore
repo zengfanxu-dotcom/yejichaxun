@@ -1,0 +1,143 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Virtual Environment
+.env
+.venv
+.venv*/
+env/
+venv/
+ENV/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Logs
+logs/
+*.log
+logs/
+
+# Database
+*.db
+*.sqlite3
+*.sqlite
+*.db.sqlite3
+*database/data/
+# Uploads
+uploads/
+media/
+static/
+
+# Cache
+.cache/
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+
+# Coverage
+.coverage
+htmlcov/
+
+# Docker
+.dockerignore
+
+# Build
+build/
+dist/
+*.egg-info/
+MANIFEST
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project specific
+*.log
+*.bak
+*.tmp
+*.backup
+__pycache__/
+*.pyc
+
+# Test
+test_*.py
+tests/
+
+# Frontend
+build/
+dist/
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Backend
+*.pyc
+__pycache__/
+*.log
+*.db
+*.sqlite3
+*.sqlite
+*.db.sqlite3
+*.egg-info/
+MANIFEST
+
+# Documentation
+docs/build/
+docs/_build/
+
+# Docker
+.dockerignore
+.docker/
+
+# Scripts
+scripts/*.sh
+scripts/*.bat
+
+# Other
+*.zip
+*.tar.gz
+*.gz
+*.rar
+*.7z
+
+# Security
+*.pem
+*.key
+*.cert
+*.crt
+*.csr
+*.p12
+*.pfx
+
+# Temporary files
+tmp/
+temp/
+TMP/
+TEMP/
