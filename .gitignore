@@ -42,6 +42,7 @@ logs/
 *.sqlite
 *.db.sqlite3
 *database/data/
+chroma_db/
 # Uploads
 uploads/
 media/
