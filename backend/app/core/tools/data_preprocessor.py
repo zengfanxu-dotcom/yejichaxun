@@ -62,6 +62,81 @@ def _to_float_amount(value: Any) -> Optional[float]:
         return None
 
 
+def _resolve_twelve_columns(columns: List[str]) -> Dict[str, str]:
+    """
+    按「规范化后的列名」绑定 12 个业务字段对应的真实列名，避免仅依赖 Excel 物理列序。
+    若解析失败则返回空 dict，由调用方回退到固定下标 0..11。
+    """
+    cols = list(columns)
+    used: set[str] = set()
+    mapping: Dict[str, str] = {}
+
+    def take(key: str, predicate) -> bool:
+        for c in cols:
+            if c in used:
+                continue
+            try:
+                if predicate(c):
+                    mapping[key] = c
+                    used.add(c)
+                    return True
+            except Exception:
+                continue
+        return False
+
+    # 顺序敏感：先匹配更具体的列，避免「合同」「竣工」等子串冲突
+    rules = [
+        ("signed", lambda c: ("签订" in c or "签约" in c) and "时间" in c),
+        ("project_name", lambda c: "项目" in c and "名称" in c and "地址" not in c),
+        ("manager", lambda c: "总监" in c or "项目经理" in c),
+        (
+            "investment",
+            lambda c: "投资" in c and "合同" not in c and "预算" not in c,
+        ),
+        ("contract", lambda c: "合同" in c and ("预算" in c or "金额" in c) and "文件" not in c and "样式" not in c),
+        ("scale", lambda c: c == "规模" or ("规模" in c and "名称" not in c)),
+        ("client", lambda c: "委托" in c),
+        ("specialty", lambda c: c == "专业" or ("专业" in c and "名称" not in c)),
+        ("completion", lambda c: "竣工" in c and "时间" in c),
+        ("file_style", lambda c: "文件" in c and "样式" in c),
+        ("acceptance", lambda c: "验收" in c and "时间" not in c),
+        ("address", lambda c: "地址" in c),
+    ]
+
+    for key, pred in rules:
+        take(key, pred)
+
+    if len(mapping) != 12:
+        logger.warning(
+            "列名语义绑定不完整（%s/12），将回退按列下标 0..11 映射；请核对 Excel 表头。已绑定: %s",
+            len(mapping),
+            mapping,
+        )
+        return {}
+    logger.info("列名语义绑定成功: %s", mapping)
+    return mapping
+
+
+def _fallback_index_columns(columns: List[str]) -> Dict[str, str]:
+    if len(columns) < 12:
+        return {}
+    keys = [
+        "signed",
+        "project_name",
+        "manager",
+        "investment",
+        "contract",
+        "scale",
+        "client",
+        "specialty",
+        "completion",
+        "file_style",
+        "acceptance",
+        "address",
+    ]
+    return {k: columns[i] for i, k in enumerate(keys)}
+
+
 def process_project_data_to_documents(file_path: str = None) -> List[Document]:
     if file_path is None:
         base_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
@@ -108,20 +183,23 @@ def process_project_data_to_documents(file_path: str = None) -> List[Document]:
     logger.info(f"检测到的列名: {columns}")
 
     if len(columns) >= 12:
-        c_signed_contract_time = columns[0]
-        c_project_name = columns[1]
-        c_manager = columns[2]
-        c_investment_amount = columns[3]
-        c_contract_budget_amount = columns[4]
-        c_scale = columns[5]
-        c_client_unit = columns[6]
-        c_specialty = columns[7]
-        c_completion_time = columns[8]
-        c_contract_file_style = columns[9]
-        c_completion_acceptance = columns[10]
-        c_project_address = columns[11]
+        colmap = _resolve_twelve_columns(columns)
+        if not colmap:
+            colmap = _fallback_index_columns(columns)
+            logger.info("使用固定列下标 0..11 映射（与当前 业绩JL 模板列序一致）。")
 
-        logger.info("检测到列数>=12，启用固定列序号映射（不依赖列名编码）。")
+        c_signed_contract_time = colmap["signed"]
+        c_project_name = colmap["project_name"]
+        c_manager = colmap["manager"]
+        c_investment_amount = colmap["investment"]
+        c_contract_budget_amount = colmap["contract"]
+        c_scale = colmap["scale"]
+        c_client_unit = colmap["client"]
+        c_specialty = colmap["specialty"]
+        c_completion_time = colmap["completion"]
+        c_contract_file_style = colmap["file_style"]
+        c_completion_acceptance = colmap["acceptance"]
+        c_project_address = colmap["address"]
 
         df["__signed_contract_time__"] = df[c_signed_contract_time].astype(str).replace("nan", "").str.strip()
         df["__project_name_full__"] = df[c_project_name].astype(str).replace("nan", "").str.strip()

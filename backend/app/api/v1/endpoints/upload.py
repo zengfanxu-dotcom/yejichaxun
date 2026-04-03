@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 # 导入 analyzer、OCR工具和RAG相关模块
 from backend.app.core.agent.analyzer import analyze_tender
 from backend.app.core.tools.ocr_tool import ocr_tool
-from backend.app.core.tools.rag_runtime import query_top1_context
+from backend.app.core.tools.rag_runtime import query_topk_context
 
 router = APIRouter()
 
@@ -47,8 +47,8 @@ async def upload(file: UploadFile = File(...)):
                 detail="无法从文件中提取文本内容，请检查文件是否包含可识别的文字"
             )
         
-        # 4. 最小RAG链路：query -> embedding -> Chroma -> top1 -> prompt拼接
-        rag_context = query_top1_context(query=text[:1000])
+        # 4. RAG：query 截断 1500 字 → Chroma Top-8 → 金额门槛重排 → 最多 4 条进 prompt
+        rag_context = query_topk_context(tender_text=text)
 
         # 5. 调用分析函数（带RAG上下文）
         result = analyze_tender(text=text, rag_context=rag_context)

@@ -4,13 +4,17 @@ PyPDF2==3.0.1
 zhipuai==2.1.5.20250825
 python-multipart==0.0.6
 python-dotenv==1.0.0
-pytesseract==0.3.10
+# 0.3.10 在 Python 3.14 上不可用（pkgutil.find_loader 已移除）
+pytesseract>=0.3.13
 pdf2image==1.16.0
 Pillow
 opencv-python
-pandas==2.2.1
+# 使用可安装的二进制版本；在 Python 3.14 上固定 2.2.1 常会触发源码编译失败
+pandas>=2.2.1
 xlrd==2.0.1
+openpyxl>=3.1.0
 langchain-community==0.3.29
 langchain-core==0.3.75
-chromadb==1.0.20
+# 1.0.x 在 Python 3.14 上因 pydantic v1 无法导入；1.1+ 使用 pydantic v2
+chromadb>=1.1.0
 sentence-transformers==3.0.1

@@ -1,3 +1,14 @@
+function formatMatchingField(item) {
+  const ids = item?.匹配项目编号;
+  if (Array.isArray(ids) && ids.length > 0) {
+    return ids.join(", ");
+  }
+  if (item?.匹配说明 != null && item.匹配说明 !== "") {
+    return String(item.匹配说明);
+  }
+  return "—";
+}
+
 export default function ResultDisplay({ result }) {
   if (!result) return null; // 如果没有结果，则不渲染
 
@@ -40,7 +51,7 @@ export default function ResultDisplay({ result }) {
             {详细计算过程.map((item, index) => (
               <li key={index}>
                 <p>得分档位: {item.得分档位}</p>
-                <p>匹配项目编号: {item.匹配项目编号.join(', ')}</p>
+                <p>匹配说明: {formatMatchingField(item)}</p>
                 <p>原始累计分值: {item.原始累计分值}</p>
                 <p>档位实际得分: {item.档位实际得分}</p>
                 <p>是否触碰封顶上限: {item.是否触碰封顶上限}</p>
@@ -57,8 +68,15 @@ export default function ResultDisplay({ result }) {
           <ul>
             {业绩剔除清单.map((item, index) => (
               <li key={index}>
-                <p>项目编号: {item.项目编号}</p>
-                <p>剔除原因: {item.剔除原因}</p>
+                <p>
+                  参考业绩:{" "}
+                  {item.参考业绩 != null && item.参考业绩 !== ""
+                    ? item.参考业绩
+                    : item.项目编号 != null
+                      ? item.项目编号
+                      : "—"}
+                </p>
+                <p>剔除原因: {item.剔除原因 ?? "—"}</p>
               </li>
             ))}
           </ul>
