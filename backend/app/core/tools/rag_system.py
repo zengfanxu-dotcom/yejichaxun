@@ -2,6 +2,7 @@ import gc
 import logging
 import os
 import re
+import shutil
 import time
 from typing import List, Optional, Tuple
 
@@ -32,8 +33,40 @@ class RAGSystem:
         embedding_model_name: str = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
     ):
         # multilingual 模型与中文查询/中文业绩描述更匹配；384 维与旧版 all-MiniLM-L6-v2 一致
-        self.embedding_model = HuggingFaceEmbeddings(model_name=embedding_model_name)
+        self.embedding_model = self._init_embeddings(embedding_model_name)
         self.vector_store: Optional[Chroma] = None
+
+    @staticmethod
+    def _init_embeddings(embedding_model_name: str) -> HuggingFaceEmbeddings:
+        """
+        默认优先使用本地缓存加载 embeddings，避免每次启动都访问 HuggingFace。
+        可通过环境变量控制：
+        - RAG_EMBEDDINGS_LOCAL_ONLY=0 关闭本地仅加载模式
+        - RAG_EMBEDDINGS_ALLOW_ONLINE_FALLBACK=1 本地失败后允许联网回退
+        - RAG_EMBEDDINGS_CACHE_FOLDER=/path 指定缓存目录
+        """
+        local_only = os.getenv("RAG_EMBEDDINGS_LOCAL_ONLY", "1") != "0"
+        allow_online_fallback = os.getenv("RAG_EMBEDDINGS_ALLOW_ONLINE_FALLBACK", "0") == "1"
+        cache_folder = os.getenv("RAG_EMBEDDINGS_CACHE_FOLDER") or None
+
+        kwargs = {"model_name": embedding_model_name, "model_kwargs": {"device": "cpu"}}
+        if cache_folder:
+            kwargs["cache_folder"] = cache_folder
+        if local_only:
+            kwargs["model_kwargs"]["local_files_only"] = True
+
+        try:
+            return HuggingFaceEmbeddings(**kwargs)
+        except Exception as e:
+            if not local_only or not allow_online_fallback:
+                raise RuntimeError(
+                    "本地向量模型加载失败。请确认本机已缓存模型，或设置 "
+                    "RAG_EMBEDDINGS_ALLOW_ONLINE_FALLBACK=1 允许联网回退。"
+                ) from e
+
+            logger.warning("本地模型加载失败，回退联网加载: %s", e)
+            kwargs["model_kwargs"].pop("local_files_only", None)
+            return HuggingFaceEmbeddings(**kwargs)
 
     def _release_vector_store(self) -> None:
         """释放 Chroma 客户端，避免 Windows 上占用 chroma_db 文件导致无法删除目录。"""
@@ -65,7 +98,19 @@ class RAGSystem:
                 del client
                 gc.collect()
         except Exception as e:
-            logger.warning("Chroma reset 失败（若目录不存在可忽略）: %s", e)
+            logger.warning("Chroma reset 失败，改用目录删除重建: %s", e)
+            # 当本地 sqlite/index 已损坏时，PersistentClient 可能在初始化阶段直接异常；
+            # 此时直接删除持久化目录，确保后续 from_documents 可以从干净状态重建。
+            if not os.path.exists(persist_directory):
+                return
+            for attempt in range(3):
+                try:
+                    shutil.rmtree(persist_directory, ignore_errors=False)
+                    break
+                except Exception as remove_err:
+                    if attempt == 2:
+                        raise remove_err
+                    time.sleep(0.15)
 
     def load_vector_store(self, persist_directory: str) -> None:
         """
@@ -104,6 +149,7 @@ class RAGSystem:
             logger.warning("初始化向量库时文档为空，跳过。")
             return
 
+        documents = self._sanitize_documents_for_chroma(documents)
         logger.info("正在初始化向量存储...")
         if persist_directory:
             os.makedirs(persist_directory, exist_ok=True)
@@ -129,10 +175,31 @@ class RAGSystem:
     def add_documents(self, documents: List[Document]):
         if not documents:
             return
+        documents = self._sanitize_documents_for_chroma(documents)
         if not self.vector_store:
             self.initialize_vector_store(documents)
             return
         self.vector_store.add_documents(documents)
+
+    @staticmethod
+    def _sanitize_documents_for_chroma(documents: List[Document]) -> List[Document]:
+        """
+        Chroma 0.5.x 要求 metadata 值必须是基础类型，且不接受 None。
+        对 None/复杂对象做清洗，避免 upsert 时报错。
+        """
+        sanitized: List[Document] = []
+        for doc in documents:
+            md = doc.metadata or {}
+            cleaned = {}
+            for key, value in md.items():
+                if value is None:
+                    continue
+                if isinstance(value, (str, int, float, bool)):
+                    cleaned[str(key)] = value
+                else:
+                    cleaned[str(key)] = str(value)
+            sanitized.append(Document(page_content=doc.page_content, metadata=cleaned))
+        return sanitized
 
     def similarity_search(self, query: str, k: int = 1) -> List[Document]:
         if not self.vector_store:

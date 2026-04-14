@@ -70,17 +70,24 @@ def ensure_rag_initialized() -> None:
 
 def rebuild_rag_index() -> int:
     """
-    重新从持久化目录加载向量库（不再 wipe/reset）。
+    强制清理并全量重建向量库。
 
-    目的：避免历史上“重建/释放导致 collection 短暂缺失”问题再次出现。
+    适用于本地持久化目录损坏、版本切换导致不兼容等场景。
     """
     global _rag_initialized
     with _rag_lock:
-        # 直接重载持久化库：不删除/不 reset，确保不会出现 collection 缺失窗口
-        _rag_system.load_vector_store(persist_directory=CHROMA_PERSIST_DIR)
+        project_docs = process_project_data_to_documents()
+        if not project_docs:
+            raise RuntimeError("RAG重建失败：未生成任何 documents")
+
+        _rag_system.initialize_vector_store(
+            project_docs,
+            persist_directory=CHROMA_PERSIST_DIR,
+            wipe_persist_directory=True,
+        )
         _rag_initialized = True
         n = _rag_system.get_document_count()
-        logger.info("RAG 向量库已安全重载，共 %s 条文档", n)
+        logger.info("RAG 向量库已清理并重建，共 %s 条文档", n)
         return n
 
 

@@ -47,35 +47,32 @@ export default function FileUpload({ onResult, onLoading, onError }) {
   };
 
   return (
-    <div>
-      <input
-        type="file"
-        accept="application/pdf"
-        onChange={(e) => {
-          const selectedFile = e.target.files[0];
-          setFile(selectedFile);
-        }}
-      />
+    <section className="upload-card">
+      <h2 className="upload-title">选择待分析文件</h2>
+      <p className="upload-hint">支持 PDF、JPG、PNG 格式，建议上传清晰文件以提升识别效果。</p>
+
+      <label className="file-input-wrap">
+        <input
+          className="file-input"
+          type="file"
+          accept="application/pdf,image/png,image/jpeg"
+          onChange={(e) => {
+            const selectedFile = e.target.files[0];
+            setFile(selectedFile);
+          }}
+        />
+      </label>
 
       {file && (
-        <div style={styles.fileInfo}>
-          <p>📄 文件名：{file.name}</p>
-          <p>📦 文件大小：{formatFileSize(file.size)}</p>
+        <div className="file-meta">
+          <p><strong>文件名：</strong>{file.name}</p>
+          <p><strong>文件大小：</strong>{formatFileSize(file.size)}</p>
         </div>
       )}
 
-      <button onClick={handleUpload} disabled={loading}>
+      <button className="primary-btn upload-btn" onClick={handleUpload} disabled={loading || !file}>
         {loading ? "分析中..." : "上传并分析"}
       </button>
-    </div>
+    </section>
   );
 }
-
-const styles = {
-  fileInfo: {
-    marginTop: "10px",
-    padding: "10px",
-    background: "#f5f5f5",
-    borderRadius: "6px",
-  },
-};

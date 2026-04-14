@@ -31,23 +31,26 @@ function App() {
   };
 
   return (
-    <div style={{ padding: "20px" }}>
-      <h1>业绩匹配分析系统</h1>
+    <div className="app-shell">
+      <div className="app-container">
+        <h1 className="app-title">业绩匹配分析系统</h1>
+        <p className="app-subtitle">上传招标文件，系统将自动完成 OCR、检索匹配与评审结果生成。</p>
 
-      <FileUpload 
-        onResult={handleResult} 
-        onLoading={handleLoading}
-        onError={handleError}
-      />
+        <FileUpload
+          onResult={handleResult}
+          onLoading={handleLoading}
+          onError={handleError}
+        />
 
-      {loading && <Loading />}
-      
-      <ErrorComponent 
-        error={error} 
-        onRetry={handleRetry}
-      />
-      
-      <ResultDisplay result={result} />
+        {loading && <Loading />}
+
+        <ErrorComponent
+          error={error}
+          onRetry={handleRetry}
+        />
+
+        <ResultDisplay result={result} />
+      </div>
     </div>
   );
 }

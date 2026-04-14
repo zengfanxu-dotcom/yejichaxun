@@ -7,16 +7,16 @@ const ErrorComponent = ({ error, onRetry }) => {
   if (!error) return null;
 
   return (
-    <div style={styles.container}>
+    <div className="error-wrap">
       <Alert
         message="分析失败"
         description={
           <div>
             <Text type="danger">{error}</Text>
             {onRetry && (
-              <button 
+              <button
                 onClick={onRetry}
-                style={styles.retryButton}
+                className="primary-btn retry-btn"
               >
                 重新上传
               </button>
@@ -25,29 +25,10 @@ const ErrorComponent = ({ error, onRetry }) => {
         }
         type="error"
         showIcon
-        style={styles.alert}
+        className="error-alert"
       />
     </div>
   );
-};
-
-const styles = {
-  container: {
-    marginTop: '20px',
-    maxWidth: '600px',
-  },
-  alert: {
-    borderRadius: '10px',
-  },
-  retryButton: {
-    marginTop: '10px',
-    padding: '6px 12px',
-    backgroundColor: '#1890ff',
-    color: 'white',
-    border: 'none',
-    borderRadius: '4px',
-    cursor: 'pointer',
-  },
 };
 
 export default ErrorComponent;

@@ -59,7 +59,10 @@ async def upload(file: UploadFile = File(...)):
             **result,
             "rag_top1_context": rag_context
         }
-        
+
+    except HTTPException:
+        # 保留上游明确的状态码与错误语义
+        raise
     except Exception as e:
         # 避免 f-string 尝试解析异常信息中的花括号
         logger.error("处理文件时发生错误: %s", e, exc_info=True)
