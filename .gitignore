@@ -89,6 +89,8 @@ __pycache__/
 # Test
 test_*.py
 tests/
+!backend/tests/
+!backend/tests/*.py
 
 # Frontend
 build/
@@ -142,3 +144,4 @@ tmp/
 temp/
 TMP/
 TEMP/
+.cursor/

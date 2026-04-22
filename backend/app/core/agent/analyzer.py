@@ -44,7 +44,7 @@ TENDER_ANALYSIS_INSTRUCTIONS = """
    - `评审状态: 失败` ⇔ `最终总得分 == 0`（含：无业绩、全剔除、规则不明）
 3. **分值勾稽**（受封顶限制）：
    - `最终总得分` = ∑ 各档 `档位实际得分`
-   - `有效业绩总数` + `无效业绩总数` = 检索到的总业绩条数（Max: 4）
+   - `有效业绩总数` = 实际计入最终得分的业绩条数（受封顶影响）
    - **互斥原则**：出现在「业绩剔除清单」的项目，其得分必为 0，且不得计入 `有效业绩总数`
 
 ## 输出格式
@@ -147,6 +147,40 @@ def _parse_amount_slot_rule(slot_desc: str) -> Optional[Tuple[str, float, float,
     per_item = float(per_item_m.group(1))
     cap = float(cap_m.group(1))
     return op, threshold, per_item, cap
+
+
+def _count_scored_items_by_details(details: Any) -> int:
+    """
+    计算“实际计入最终得分”的业绩条数。
+    对可解析“每个X分，最多Y分”的档位，按档位实际得分/每项分值反推计分条数；
+    否则回退为 0，由上层兜底策略处理。
+    """
+    if not isinstance(details, list):
+        return 0
+
+    scored_items = 0
+    for item in details:
+        if not isinstance(item, dict):
+            continue
+
+        parsed = _parse_amount_slot_rule(str(item.get("得分档位", "")))
+        if not parsed:
+            continue
+
+        per_item = parsed[2]
+        if per_item <= 0:
+            continue
+
+        raw_score = _to_float(item.get("原始累计分值"))
+        actual_score = _to_float(item.get("档位实际得分"))
+        if raw_score is None or actual_score is None:
+            continue
+
+        raw_count = max(int(round(raw_score / per_item)), 0)
+        actual_count = max(int(round(actual_score / per_item)), 0)
+        scored_items += min(actual_count, raw_count)
+
+    return max(scored_items, 0)
 
 
 def _is_same_project_name(ref_name: str, cand_name: str) -> bool:
@@ -290,10 +324,23 @@ def _apply_deterministic_amount_validation(
             summary = {}
             result["得分摘要"] = summary
         summary["最终总得分"] = round(total_score, 4)
+        scored_count = _count_scored_items_by_details(details_new)
         qualified = result.get("合格业绩清单")
         excluded = result.get("业绩剔除清单")
-        summary["有效业绩总数"] = len(qualified) if isinstance(qualified, list) else 0
-        summary["无效业绩总数"] = len(excluded) if isinstance(excluded, list) else 0
+        qualified_count = len(qualified) if isinstance(qualified, list) else 0
+        excluded_count = len(excluded) if isinstance(excluded, list) else 0
+
+        # 兜底规则：最终总分为 0 时，说明没有任何业绩被实际计分。
+        if total_score <= 0:
+            summary["有效业绩总数"] = 0
+            # 某些不规则输出里会出现“总分为0但合格清单非空”，这里统一按无效业绩计入统计。
+            summary["无效业绩总数"] = max(excluded_count, qualified_count)
+        else:
+            if scored_count > 0:
+                summary["有效业绩总数"] = scored_count
+            else:
+                summary["有效业绩总数"] = qualified_count
+            summary["无效业绩总数"] = excluded_count
         result["评审状态"] = "成功" if total_score > 0 else "失败"
 
     return result

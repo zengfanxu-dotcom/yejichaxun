@@ -132,14 +132,36 @@ code {
 
 .loading-container {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
   gap: 12px;
   margin-top: 4px;
 }
 
+.loading-content {
+  width: min(420px, 70vw);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 .loading-text {
   font-size: 0.95rem;
+}
+
+.loading-progress-track {
+  width: 100%;
+  height: 8px;
+  border-radius: 999px;
+  background: #e5e7eb;
+  overflow: hidden;
+}
+
+.loading-progress-bar {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #2563eb 0%, #1d4ed8 100%);
+  transition: width 0.3s ease;
 }
 
 .error-wrap {
@@ -153,6 +175,229 @@ code {
 .retry-btn {
   display: block;
   margin-top: 12px;
+}
+
+.history-card {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  padding: 18px 20px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+}
+
+.history-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.history-title {
+  margin: 0;
+  font-size: 1.1rem;
+  color: #111827;
+}
+
+.history-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.history-filter-select {
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 6px 10px;
+  background: #ffffff;
+  color: #374151;
+  font-size: 0.85rem;
+}
+
+.history-refresh-btn {
+  padding: 8px 14px;
+  font-size: 0.85rem;
+  box-shadow: none;
+}
+
+.history-empty {
+  margin: 0;
+  color: #6b7280;
+}
+
+.history-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.history-metric-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: #f8fafc;
+}
+
+.history-metric-title {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+
+.history-metric-value {
+  margin: 6px 0 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.history-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: #f8fafc;
+}
+
+.history-item-main {
+  min-width: 0;
+}
+
+.history-file-name {
+  margin: 0 0 4px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.history-meta {
+  margin: 2px 0;
+  color: #4b5563;
+  font-size: 0.88rem;
+  word-break: break-all;
+}
+
+.history-view-btn {
+  padding: 8px 14px;
+  font-size: 0.85rem;
+  box-shadow: none;
+  min-width: 96px;
+}
+
+.history-detail-btn {
+  background: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%);
+  padding: 8px 14px;
+  font-size: 0.85rem;
+  box-shadow: none;
+  min-width: 96px;
+}
+
+.history-item-actions {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+}
+
+.history-retry-btn {
+  background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+}
+
+.history-cancel-btn {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+}
+
+.history-detail-mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.35);
+  display: flex;
+  justify-content: flex-end;
+  z-index: 1000;
+}
+
+.history-detail-drawer {
+  width: min(520px, 92vw);
+  height: 100%;
+  background: #ffffff;
+  box-shadow: -10px 0 30px rgba(15, 23, 42, 0.2);
+  display: flex;
+  flex-direction: column;
+}
+
+.history-detail-header {
+  padding: 16px 18px;
+  border-bottom: 1px solid #e5e7eb;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.history-detail-title {
+  margin: 0;
+  font-size: 1rem;
+  color: #111827;
+}
+
+.history-detail-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.history-detail-copy-btn {
+  border: 1px solid #c7d2fe;
+  border-radius: 8px;
+  padding: 6px 10px;
+  background: #eef2ff;
+  color: #3730a3;
+  cursor: pointer;
+}
+
+.history-detail-close-btn {
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 6px 12px;
+  background: #ffffff;
+  color: #374151;
+  cursor: pointer;
+}
+
+.history-detail-body {
+  padding: 14px 18px 20px;
+  overflow-y: auto;
+}
+
+.history-detail-subtitle {
+  margin: 14px 0 10px;
+  color: #111827;
+}
+
+.history-event-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.history-event-item {
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #f8fafc;
+  padding: 10px 12px;
+}
+
+.history-event-item-error {
+  border-color: #fecaca;
+  background: #fff1f2;
 }
 
 .result-card {

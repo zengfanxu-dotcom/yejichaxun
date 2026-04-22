@@ -14,6 +14,11 @@ logger = logging.getLogger(__name__)
 _rag_system = RAGSystem()
 _rag_initialized = False
 _rag_lock = threading.RLock()
+_active_slot: Optional[str] = None
+
+SLOT_A = "A"
+SLOT_B = "B"
+SLOT_NAMES = (SLOT_A, SLOT_B)
 
 # 默认：向量召回 K、送入 LLM 条数、检索 query 最大字符数
 RAG_RETRIEVE_K = 8
@@ -24,7 +29,8 @@ RAG_QUERY_MAX_LEN = 1500
 def get_rag_system() -> RAGSystem:
     return _rag_system
 
-def _chroma_persist_dir() -> str:
+
+def _chroma_root_dir() -> str:
     """
     使用仓库根目录的绝对路径，避免 uvicorn/reload 时工作目录变化导致
     persist 目录相对路径失效，从而出现 collection 不存在。
@@ -35,37 +41,104 @@ def _chroma_persist_dir() -> str:
     return os.path.join(repo_root, "chroma_db")
 
 
-CHROMA_PERSIST_DIR = _chroma_persist_dir()
+CHROMA_ROOT_DIR = _chroma_root_dir()
+CHROMA_SLOTS_DIR = os.path.join(CHROMA_ROOT_DIR, "slots")
+ACTIVE_SLOT_FILE = os.path.join(CHROMA_ROOT_DIR, "active_slot.txt")
+
+
+def _slot_persist_dir(slot: str) -> str:
+    return os.path.join(CHROMA_SLOTS_DIR, slot)
+
+
+def _read_active_slot() -> Optional[str]:
+    if not os.path.exists(ACTIVE_SLOT_FILE):
+        return None
+    try:
+        with open(ACTIVE_SLOT_FILE, "r", encoding="utf-8") as f:
+            value = f.read().strip().upper()
+            return value if value in SLOT_NAMES else None
+    except Exception:
+        return None
+
+
+def _write_active_slot(slot: str) -> None:
+    os.makedirs(CHROMA_ROOT_DIR, exist_ok=True)
+    tmp_path = ACTIVE_SLOT_FILE + ".tmp"
+    with open(tmp_path, "w", encoding="utf-8") as f:
+        f.write(slot)
+    os.replace(tmp_path, ACTIVE_SLOT_FILE)
+
+
+def _other_slot(slot: Optional[str]) -> str:
+    if slot == SLOT_A:
+        return SLOT_B
+    return SLOT_A
+
+
+def get_active_slot() -> Optional[str]:
+    with _rag_lock:
+        return _active_slot or _read_active_slot()
+
+
+def _load_slot_if_available(slot: str) -> bool:
+    persist_dir = _slot_persist_dir(slot)
+    if not os.path.exists(persist_dir):
+        return False
+    try:
+        _rag_system.load_vector_store(persist_directory=persist_dir)
+        return True
+    except Exception as e:
+        logger.warning("RAG槽位加载失败 slot=%s: %s", slot, e)
+        return False
 
 
 def ensure_rag_initialized() -> None:
-    global _rag_initialized
+    global _rag_initialized, _active_slot
     with _rag_lock:
         if _rag_initialized and _rag_system.vector_store is not None:
             return
 
-        # 优先：只加载已存在的持久化库，避免 wipe/reset 造成“集合瞬间缺失”
-        try:
-            if os.path.exists(CHROMA_PERSIST_DIR):
-                _rag_system.load_vector_store(persist_directory=CHROMA_PERSIST_DIR)
+        preferred_slot = _read_active_slot()
+        if preferred_slot and _load_slot_if_available(preferred_slot):
+            _rag_initialized = True
+            _active_slot = preferred_slot
+            logger.info("RAG向量库已加载（active_slot=%s）", preferred_slot)
+            return
+
+        for slot in SLOT_NAMES:
+            if _load_slot_if_available(slot):
                 _rag_initialized = True
-                logger.info("RAG向量库已从持久化目录加载（共享运行时）")
+                _active_slot = slot
+                _write_active_slot(slot)
+                logger.warning("RAG active slot 恢复为 %s", slot)
+                return
+
+        # 向后兼容：旧版单目录结构（chroma_db 根目录）。
+        try:
+            if os.path.exists(CHROMA_ROOT_DIR):
+                _rag_system.load_vector_store(persist_directory=CHROMA_ROOT_DIR)
+                _rag_initialized = True
+                _active_slot = None
+                logger.info("RAG向量库已从旧版目录加载（legacy mode）")
                 return
         except Exception as e:
             logger.warning("RAG向量库持久化加载失败，将回退全量构建: %s", e)
 
-        # 回退：持久化加载失败才全量重建（且必须 wipe，保证一致性）
         project_docs = process_project_data_to_documents()
         if not project_docs:
             raise RuntimeError("RAG重建失败：未生成任何 documents")
 
+        os.makedirs(CHROMA_SLOTS_DIR, exist_ok=True)
+        target_slot = SLOT_A
         _rag_system.initialize_vector_store(
             project_docs,
-            persist_directory=CHROMA_PERSIST_DIR,
+            persist_directory=_slot_persist_dir(target_slot),
             wipe_persist_directory=True,
         )
+        _write_active_slot(target_slot)
+        _active_slot = target_slot
         _rag_initialized = True
-        logger.info("RAG向量库初始化完成（已回退全量构建）")
+        logger.info("RAG向量库初始化完成（active_slot=%s）", target_slot)
 
 
 def rebuild_rag_index() -> int:
@@ -74,21 +147,38 @@ def rebuild_rag_index() -> int:
 
     适用于本地持久化目录损坏、版本切换导致不兼容等场景。
     """
-    global _rag_initialized
-    with _rag_lock:
-        project_docs = process_project_data_to_documents()
-        if not project_docs:
-            raise RuntimeError("RAG重建失败：未生成任何 documents")
+    global _rag_initialized, _rag_system, _active_slot
+    project_docs = process_project_data_to_documents()
+    if not project_docs:
+        raise RuntimeError("RAG重建失败：未生成任何 documents")
 
-        _rag_system.initialize_vector_store(
-            project_docs,
-            persist_directory=CHROMA_PERSIST_DIR,
-            wipe_persist_directory=True,
-        )
+    with _rag_lock:
+        current_slot = _active_slot or _read_active_slot()
+        target_slot = _other_slot(current_slot)
+
+    os.makedirs(CHROMA_SLOTS_DIR, exist_ok=True)
+    target_dir = _slot_persist_dir(target_slot)
+
+    # 先在备用槽位构建，在线槽位继续服务；构建成功后再做原子切换。
+    builder = RAGSystem()
+    builder.initialize_vector_store(
+        project_docs,
+        persist_directory=target_dir,
+        wipe_persist_directory=True,
+    )
+    n = builder.get_document_count()
+    if n <= 0:
+        raise RuntimeError("RAG重建失败：新槽位文档数为 0")
+
+    with _rag_lock:
+        old_slot = _active_slot
+        _rag_system = builder
         _rag_initialized = True
-        n = _rag_system.get_document_count()
-        logger.info("RAG 向量库已清理并重建，共 %s 条文档", n)
-        return n
+        _active_slot = target_slot
+        _write_active_slot(target_slot)
+
+    logger.info("RAG 双槽位切换完成: %s -> %s, 文档数 %s", old_slot or "legacy", target_slot, n)
+    return n
 
 
 def build_rag_query(tender_text: str, max_len: int = RAG_QUERY_MAX_LEN) -> str:

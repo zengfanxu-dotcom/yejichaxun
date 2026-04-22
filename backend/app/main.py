@@ -7,9 +7,14 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 # 导入路由
+from backend.app.api.v1.endpoints.analyze import router as analyze_router
+from backend.app.api.v1.endpoints.report import router as report_router
+from backend.app.api.v1.endpoints.tasks import router as tasks_router
 from backend.app.api.v1.endpoints.upload import router as upload_router
 from backend.app.api.v1.endpoints.ocr import router as ocr_router
 from backend.app.api.v1.endpoints.rag import router as rag_router
+from backend.app.api.v1.endpoints.ws_tasks import router as ws_tasks_router
+from backend.app.db.init_db import init_db
 
 # 配置日志
 logging.basicConfig(
@@ -23,6 +28,11 @@ logging.basicConfig(
 
 app = FastAPI()
 
+
+@app.on_event("startup")
+def on_startup() -> None:
+    init_db()
+
 # 允许前端访问（解决跨域）
 app.add_middleware(
     CORSMiddleware,
@@ -35,5 +45,9 @@ app.add_middleware(
 )
 
 app.include_router(upload_router, prefix="/api/v1")
+app.include_router(analyze_router, prefix="/api/v1")
+app.include_router(report_router, prefix="/api/v1")
+app.include_router(tasks_router, prefix="/api/v1")
 app.include_router(ocr_router, prefix="/api/v1")
 app.include_router(rag_router, prefix="/api/v1")
+app.include_router(ws_tasks_router, prefix="/api/v1")

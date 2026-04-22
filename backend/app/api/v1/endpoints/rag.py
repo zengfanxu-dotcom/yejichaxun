@@ -3,7 +3,7 @@ import logging
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from backend.app.core.tools.rag_runtime import query_top1_context, rebuild_rag_index
+from backend.app.core.tools.rag_runtime import get_active_slot, query_top1_context, rebuild_rag_index
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -25,7 +25,12 @@ async def rag_rebuild():
     """
     try:
         n = rebuild_rag_index()
-        return {"ok": True, "document_count": n, "message": "RAG 已清除并重建"}
+        return {
+            "ok": True,
+            "document_count": n,
+            "active_slot": get_active_slot(),
+            "message": "RAG 已清除并重建并完成原子切换",
+        }
     except Exception as e:
         logger.error("RAG 重建失败: %s", e, exc_info=True)
         raise HTTPException(status_code=500, detail=f"RAG 重建失败: {str(e)}")
